@@ -14,4 +14,4 @@ services:
   app2:
     image: <ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/whale-app:latest
     environment:
-      - PORT=3001
+      - PORT=3000

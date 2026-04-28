@@ -17,3 +17,8 @@ variable "key_pair_name" {
 variable "instance_type" {
   default = "t3.micro"
 }
+
+variable "db_password" {
+  description = "RDS master password"
+  sensitive   = true
+}

@@ -3,12 +3,28 @@
 }
 
 locals {
+  nginx_conf_b64 = base64encode(file("${path.module}/templates/nginx.conf"))
+
+  compose_b64 = base64encode(templatefile("${path.module}/templates/docker-compose.tpl", {
+    ecr_base    = local.ecr_base
+    project     = var.project
+    db_host     = var.db_host
+    db_name     = var.db_name
+    db_username = var.db_username
+    db_password = var.db_password
+  }))
+
   user_data = <<-EOF
     #!/bin/bash
     set -e
     exec > /var/log/user-data.log 2>&1
 
-    # Wait for network/NAT gateway to be ready
+    echo "=== Starting user_data ==="
+    echo "Account: ${var.account_id}"
+    echo "Region:  ${var.region}"
+    echo "ECR:     ${local.ecr_base}"
+
+    # Wait for NAT Gateway + network
     echo "Waiting for network..."
     until curl -s --max-time 5 https://amazon.com > /dev/null 2>&1; do
       echo "Network not ready, retrying in 10s..."
@@ -16,64 +32,44 @@ locals {
     done
     echo "Network is ready"
 
+    # Install Docker
     yum update -y
     yum install -y docker
     systemctl enable docker
     systemctl start docker
 
+    # Install docker-compose
     curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
       -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
 
-    aws ecr get-login-password --region ${var.region} | \
-      docker login --username AWS --password-stdin ${local.ecr_base}
+    # Write nginx.conf from base64 (no heredoc, no BOM, no formatting issues)
+    echo "${local.nginx_conf_b64}" | base64 -d > /home/ec2-user/nginx.conf
 
-    cat > /home/ec2-user/nginx.conf << 'NGINXCONF'
-events {
-  worker_connections 1024;
-}
+    # Write docker-compose.yml from base64
+    echo "${local.compose_b64}" | base64 -d > /home/ec2-user/docker-compose.yml
 
-http {
-  upstream app_servers {
-    server app1:3000;
-    server app2:3001;
-  }
+    # Login to ECR with retry
+    echo "Logging in to ECR..."
+    until aws ecr get-login-password --region ${var.region} | \
+      docker login --username AWS --password-stdin ${local.ecr_base}; do
+      echo "ECR login failed, retrying in 10s..."
+      sleep 10
+    done
+    echo "ECR login succeeded"
 
-  server {
-    listen 80;
-
-    location / {
-      proxy_pass http://app_servers;
-      proxy_set_header Host $host;
-      proxy_set_header X-Real-IP $remote_addr;
-    }
-  }
-}
-NGINXCONF
-
-    cat > /home/ec2-user/docker-compose.yml << 'COMPOSE'
-services:
-  nginx:
-    image: ${local.ecr_base}/${var.project}-nginx:latest
-    ports:
-      - "80:80"
-    volumes:
-      - /home/ec2-user/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - app1
-      - app2
-  app1:
-    image: ${local.ecr_base}/${var.project}-app:latest
-    environment:
-      - PORT=3000
-  app2:
-    image: ${local.ecr_base}/${var.project}-app:latest
-    environment:
-      - PORT=3001
-COMPOSE
-
+    # Pull images with retry
+    echo "Pulling images..."
     cd /home/ec2-user
+    until /usr/local/bin/docker-compose pull; do
+      echo "Pull failed, retrying in 15s..."
+      sleep 15
+    done
+    echo "Images pulled"
+
+    # Start containers
     /usr/local/bin/docker-compose up -d
+    echo "=== user_data complete ==="
   EOF
 }
 

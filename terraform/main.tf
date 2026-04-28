@@ -34,6 +34,16 @@ module "iam" {
   common_tags = local.common_tags
 }
 
+module "rds" {
+  source         = "./modules/rds"
+  project        = local.project
+  vpc_id         = module.vpc.vpc_id
+  db_subnet_ids  = module.vpc.db_subnet_ids
+  ec2_sg_id      = module.security_groups.ec2_sg_id
+  db_password    = var.db_password
+  common_tags    = local.common_tags
+}
+
 module "security_groups" {
   source      = "./modules/security_groups"
   project     = local.project
@@ -51,15 +61,41 @@ module "alb" {
 }
 
 module "ec2" {
-  source              = "./modules/ec2"
-  project             = local.project
-  private_subnet_ids  = module.vpc.private_subnet_ids
-  ec2_sg_id           = module.security_groups.ec2_sg_id
-  instance_profile    = module.iam.instance_profile_name
-  key_pair_name       = var.key_pair_name
-  instance_type       = var.instance_type
-  account_id          = var.account_id
-  region              = local.region
-  target_group_arn    = module.alb.target_group_arn
-  common_tags         = local.common_tags
+  source             = "./modules/ec2"
+  project            = local.project
+  private_subnet_ids = module.vpc.private_subnet_ids
+  ec2_sg_id          = module.security_groups.ec2_sg_id
+  instance_profile   = module.iam.instance_profile_name
+  key_pair_name      = var.key_pair_name
+  instance_type      = var.instance_type
+  account_id         = var.account_id
+  region             = local.region
+  target_group_arn   = module.alb.target_group_arn
+  common_tags        = local.common_tags
+  db_host            = module.rds.db_host
+  db_name            = module.rds.db_name
+  db_username        = module.rds.db_username
+  db_password        = var.db_password
+}
+
+module "bastion" {
+  source           = "./modules/bastion"
+  project          = local.project
+  public_subnet_id = module.vpc.public_subnet_ids[0]
+  key_pair_name    = var.key_pair_name
+  ec2_sg_id        = module.security_groups.ec2_sg_id
+  common_tags      = local.common_tags
+}
+
+module "lambda_seed" {
+  source      = "./modules/lambda_seed"
+  project     = local.project
+  vpc_id      = module.vpc.vpc_id
+  subnet_ids  = module.vpc.private_subnet_ids
+  rds_sg_id   = module.rds.rds_sg_id
+  db_host     = module.rds.db_host
+  db_name     = module.rds.db_name
+  db_username = module.rds.db_username
+  db_password = var.db_password
+  common_tags = local.common_tags
 }

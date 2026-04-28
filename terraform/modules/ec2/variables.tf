@@ -8,3 +8,7 @@ variable "account_id"         {}
 variable "region"             {}
 variable "target_group_arn"   {}
 variable "common_tags"        { type = map(string) }
+variable "db_host"            {}
+variable "db_name"            {}
+variable "db_username"        {}
+variable "db_password"        { sensitive = true }

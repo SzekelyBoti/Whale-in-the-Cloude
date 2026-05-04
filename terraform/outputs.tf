@@ -26,3 +26,7 @@ output "server_ips" {
 output "lambda_seed_name" {
   value = module.lambda_seed.function_name
 }
+
+output "whale_reports_bucket" {
+  value = module.whale_reports_bucket.bucket_name
+}

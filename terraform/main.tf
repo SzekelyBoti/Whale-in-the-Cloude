@@ -99,3 +99,26 @@ module "lambda_seed" {
   db_password = var.db_password
   common_tags = local.common_tags
 }
+
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+module "whale_reports_bucket" {
+  source      = "./modules/s3"
+  bucket_name = local.reports_bucket_name
+  tags        = local.common_tags
+}
+
+module "lambda_report" {
+  source        = "./modules/lambda_report"
+  project       = local.project
+  function_name = "whale-report-lambda"
+  filename      = "lambda/report.zip"
+  bucket_name   = module.whale_reports_bucket.bucket_name
+  vpc_id        = module.vpc.vpc_id
+  subnet_ids    = module.vpc.private_subnet_ids
+  server_ips    = module.ec2.private_ips
+  ec2_sg_id     = module.security_groups.ec2_sg_id
+  common_tags   = local.common_tags
+}

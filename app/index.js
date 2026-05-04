@@ -4,8 +4,8 @@ const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+let counter = 0;
 
-// PostgreSQL connection pool
 const pool = new Pool({
     host:     process.env.DB_HOST,
     port:     process.env.DB_PORT || 5432,
@@ -15,7 +15,6 @@ const pool = new Pool({
     ssl:      { rejectUnauthorized: false }
 });
 
-// Create table if it doesn't exist
 async function initDb() {
     try {
         await pool.query(`
@@ -37,13 +36,11 @@ async function initDb() {
 
 app.get('/', async (req, res) => {
     try {
-        // Record this visit
         await pool.query(
             'INSERT INTO visits (host) VALUES ($1)',
             [os.hostname()]
         );
 
-        // Get total visit count
         const result = await pool.query('SELECT COUNT(*) FROM visits');
         const count = parseInt(result.rows[0].count);
 
@@ -56,6 +53,21 @@ app.get('/', async (req, res) => {
         console.error(err);
         res.status(500).json({ error: 'Database error', detail: err.message });
     }
+});
+
+app.get('/count', (req, res) => {
+    counter++;
+    res.json({
+        host: os.hostname(),
+        count: counter
+    });
+});
+
+app.get('/count/current', (req, res) => {
+    res.json({
+        host: os.hostname(),
+        count: counter
+    });
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

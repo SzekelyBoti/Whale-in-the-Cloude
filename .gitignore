@@ -1,0 +1,21 @@
+﻿# Terraform
+terraform/terraform.tfvars
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+
+# Lambda build artifacts
+lambda/report.zip
+lambda/seed.zip
+
+# AWS keys
+*.pem
+
+# Node
+node_modules/
+app/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

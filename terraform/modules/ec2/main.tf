@@ -1,4 +1,31 @@
-﻿locals {
+﻿resource "aws_security_group" "ec2" {
+  name   = "${var.project}-ec2-sg"
+  vpc_id = var.vpc_id
+
+  ingress {
+    description     = "HTTP from ALB only"
+    from_port       = var.app_port
+    to_port         = var.app_port
+    protocol        = "tcp"
+    security_groups = [var.alb_sg_id]
+  }
+  ingress {
+    description = "SSH from within VPC only"
+    from_port   = var.ssh_port
+    to_port     = var.ssh_port
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = merge(var.common_tags, { Name = "${var.project}-ec2-sg" })
+}
+
+locals {
   ecr_base = "${var.account_id}.dkr.ecr.${var.region}.amazonaws.com"
 }
 
@@ -87,11 +114,10 @@ resource "aws_instance" "servers" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   subnet_id              = var.private_subnet_ids[count.index]
-  vpc_security_group_ids = [var.ec2_sg_id]
+  vpc_security_group_ids = [aws_security_group.ec2.id]
   iam_instance_profile   = var.instance_profile
   key_name               = var.key_pair_name
   user_data              = local.user_data
-
   tags = merge(var.common_tags, {
     Name = "${var.project}-server-${count.index + 1}"
   })

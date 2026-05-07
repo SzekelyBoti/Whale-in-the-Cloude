@@ -294,7 +294,6 @@ aws lambda invoke \
         ├── rds/
         ├── s3/
         ├── bastion/
-        ├── security_groups/
         ├── lambda_seed/
         └── lambda_report/
 ```
